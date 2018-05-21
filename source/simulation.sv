@@ -37,8 +37,10 @@ module simulation();
             end
         end
         cnt = cnt + 1;
-        if(cnt === 200)
+        if(cnt === 512)begin
+            $display("Some error occurs!");
             $stop;
+        end
     end
 
 endmodule  

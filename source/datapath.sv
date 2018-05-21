@@ -20,7 +20,7 @@ module datapath #(parameter N = 64, W = 32, I = 16 ,B = 8)(
 );
     logic [4:0]     writereg;
     logic [N-1:0]   pcnext, pc;
-    logic [31:0]    instr;
+    logic [W-1:0]   instr;
     logic [N-1:0]   data, srca, srcb;
     logic [N-1:0]   rda;
     logic [N-1:0]   aluresult, aluout;
