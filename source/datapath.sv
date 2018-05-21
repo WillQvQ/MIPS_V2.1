@@ -7,7 +7,7 @@ module datapath #(parameter N = 64, W = 32, I = 16 ,B = 8)(
     input   logic       iord, memtoreg, regdst, alusrca, 
     input   logic [2:0] alusrcb,
     input   logic [1:0] pcsrc,
-    input   logic [2:0] alucontrol,
+    input   logic [3:0] alucontrol,
     input   logic [1:0] ltype,
     output  logic [5:0] op, funct,
     output  logic       zero,
@@ -21,8 +21,6 @@ module datapath #(parameter N = 64, W = 32, I = 16 ,B = 8)(
     logic [4:0]     writereg;
     logic [N-1:0]   pcnext, pc;
     logic [31:0]    instr;
-    logic [W-1:0]   alures32;
-    logic [N-1:0]   alures64;
     logic [N-1:0]   data, srca, srcb;
     logic [N-1:0]   rda;
     logic [N-1:0]   aluresult, aluout;
@@ -32,12 +30,9 @@ module datapath #(parameter N = 64, W = 32, I = 16 ,B = 8)(
     logic [N-1:0]   wd3, rd1, rd2;
     logic [N-1:0]   memdata, mbytezext, mbytesext; 
     logic [B-1:0]   mbyte;
-    logic           zero32,zero64;
     assign op = instr[31:26];
     assign funct = instr[5:0];
     assign pclow = pc[9:2];
-    assign aluresult = dtype ? alures64: {32'b0,alures32};
-    assign zero = dtype ? zero64: zero32;
     flopenr #(N)    pcreg(clk, reset, pcen, pcnext, pc);
     mux2 #(N)       adrmux(pc, aluout, iord, dataadr);
     flopenr #(W)    instrreg(clk, reset, irwrite, readdata[W-1:0], instr);
@@ -58,8 +53,7 @@ module datapath #(parameter N = 64, W = 32, I = 16 ,B = 8)(
     sl2 #(N)        immsh(signimm, signimmsh);
     mux2 #(N)       srcamux(pc, rda, alusrca, srca);
     mux5 #(N)       srcbmux(writedata, 64'b100, signimm, signimmsh, zeroimm, alusrcb, srcb);
-    alu #(N)        alu64(srca, srcb, alucontrol, alures64, zero64);
-    alu #(W)        alu32(srca[31:0], srcb[31:0], alucontrol, alures32, zero32);
+    alu #(N)        alu64(srca, srcb, alucontrol, aluresult, zero);
     flopr #(N)      alureg(clk, reset, aluresult, aluout);
     mux3 #(N)       pcmux(aluresult, aluout, {32'b0,pc[31:28], instr[25:0], 2'b00},pcsrc, pcnext);
 endmodule

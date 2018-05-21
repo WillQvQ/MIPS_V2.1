@@ -11,15 +11,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="921441557fs"></ZoomStartTime>
-      <ZoomEndTime time="1015711689fs"></ZoomEndTime>
-      <Cursor1Time time="1000000000fs"></Cursor1Time>
+      <ZoomStartTime time="787094900fs"></ZoomStartTime>
+      <ZoomEndTime time="898094901fs"></ZoomEndTime>
+      <Cursor1Time time="834495000fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
       <NameColumnWidth column_width="136"></NameColumnWidth>
-      <ValueColumnWidth column_width="59"></ValueColumnWidth>
+      <ValueColumnWidth column_width="55"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="10" />
+   <WVObjectSize size="15" />
    <wvobject fp_name="/simulation/top/mem/RAM" type="array">
       <obj_property name="ElementShortName">RAM[127:0][63:0]</obj_property>
       <obj_property name="ObjectShortName">RAM[127:0][63:0]</obj_property>
@@ -60,5 +60,25 @@
    <wvobject fp_name="/simulation/top/mips/datapath/pcnext" type="array">
       <obj_property name="ElementShortName">pcnext[63:0]</obj_property>
       <obj_property name="ObjectShortName">pcnext[63:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/simulation/top/mips/datapath/regfile/rf[6]" type="array">
+      <obj_property name="ElementShortName">[6][63:0]</obj_property>
+      <obj_property name="ObjectShortName">[6][63:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/simulation/top/mips/datapath/regfile/rf[5]" type="array">
+      <obj_property name="ElementShortName">[5][63:0]</obj_property>
+      <obj_property name="ObjectShortName">[5][63:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/simulation/top/mips/datapath/regfile/rf[4]" type="array">
+      <obj_property name="ElementShortName">[4][63:0]</obj_property>
+      <obj_property name="ObjectShortName">[4][63:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/simulation/top/mips/controller/dalu" type="logic">
+      <obj_property name="ElementShortName">dalu</obj_property>
+      <obj_property name="ObjectShortName">dalu</obj_property>
+   </wvobject>
+   <wvobject fp_name="/simulation/top/mips/controller/dread" type="logic">
+      <obj_property name="ElementShortName">dread</obj_property>
+      <obj_property name="ObjectShortName">dread</obj_property>
    </wvobject>
 </wave_config>

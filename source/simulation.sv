@@ -33,7 +33,7 @@ module simulation();
             end
         end
         cnt = cnt + 1;
-        if(cnt === 192)
+        if(cnt === 200)
             $stop;
     end
 

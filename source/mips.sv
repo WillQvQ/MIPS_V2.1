@@ -15,7 +15,7 @@ module mips#(parameter N = 64)(
     logic       memtoreg, regdst, regwrite, zero;
     logic       alusrca;    
     logic [2:0] alusrcb;    
-    logic [2:0] alucontrol;
+    logic [3:0] alucontrol;
     logic [1:0] pcsrc, ltype;         
     logic [5:0] op, funct;
     controller controller(clk, reset, op, funct, zero,
