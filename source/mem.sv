@@ -18,9 +18,9 @@ module mem#(parameter N = 64, L = 128)(
     assign word = dataadr[2] ? RAM[dataadr[N-1:3]][31:0] : RAM[dataadr[N-1:3]][63:32];
     always @(posedge clk)
         begin
-        if (memwrite===3)//D
+        if (memwrite==3)//D
             RAM[dataadr[N-1:3]] <= writedata;
-        else if (memwrite===2) //B
+        else if (memwrite==2) //B
                 case (dataadr[2:0])
                     3'b111:  RAM[dataadr[N-1:3]][7:0]   <= writedata[7:0];
                     3'b110:  RAM[dataadr[N-1:3]][15:8]  <= writedata[7:0];
@@ -31,7 +31,7 @@ module mem#(parameter N = 64, L = 128)(
                     3'b001:  RAM[dataadr[N-1:3]][55:48] <= writedata[7:0];
                     3'b000:  RAM[dataadr[N-1:3]][63:56] <= writedata[7:0];
                 endcase
-        else if (memwrite===1) //W
+        else if (memwrite==1) //W
             case (dataadr[2])
                     0:  RAM[dataadr[N-1:3]][63:32]  <= writedata[31:0];
                     1:  RAM[dataadr[N-1:3]][31:0]   <= writedata[31:0];

@@ -6,6 +6,7 @@ module simulation();
     logic [63:0]writedata, dataadr;
     logic [1:0] memwrite;
     logic [63:0]datapc;
+    logic [63:0]readdata;
     logic [9:0] cnt;
     logic [7:0] pclow;
     logic [7:0] addr;

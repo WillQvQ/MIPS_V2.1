@@ -10,8 +10,10 @@ module onboard(
 );
 	logic clk,CLK380,CLK48,CLK04,CLK1_6,clkrun;
 
+	logic [63:0]writedata64, dataadr64;
 	logic [31:0]writedata, dataadr;
-	logic       memwrite;
+	logic [1:0] memwrite;
+	logic [63:0]readdata64;
 	logic [31:0]readdata;
 	logic [2:0]cnt;
 	logic [3:0]digit;   
@@ -23,14 +25,19 @@ module onboard(
 	logic [4:0] stateout;
     logic [4:0] checka;
     logic [31:0]check;
+    logic [63:0]check64;
 	logic [31:0]memdata;
 	clkdiv clkdiv(CLK100MHZ,CLK380,CLK48,CLK1_6,CLK0_4);
+	assign writedata = writedata64[31:0];
+	assign readdata = readdata64[31:0];
+	assign dataadr = dataadr64[31:0];
+	assign check = check64[31:0];
 	assign checka = addr[4:0];
 	assign clkrun = quick ? CLK1_6:CLK0_4;
 	assign clk = clkrun & clken;
-	top top(clk, reset, writedata, dataadr, memwrite, readdata, pclow, state,checka,check,addr,memdata);
+	top top(clk,reset,writedata64,dataadr64,memwrite,readdata64,pclow,state,checka,check64,addr,memdata);
 	assign showdata = show ? memdata:{addr,check[7:0],pclow,3'b0,stateout};
-	assign data = memwrite?datamem:showdata;
+	assign data = memwrite[0]?datamem:showdata;
 	initial cnt=2'b0;
     initial datamem=32'b0;
     initial clks=8'b0;
@@ -67,7 +74,6 @@ module onboard(
 				5:digit=data[23:20];
 				6:digit=data[27:24];
 				7:digit=data[31:28];  
-				default:digit=4'b0;  
 			endcase  
 			case(digit)  
 				0:seg=   7'b1000000;  

@@ -20,6 +20,52 @@ alu.sv          修改参数N=64，增加了一些双字的运算，alucontrol�
 
 对于整个系统的详细介绍在MIPS_V2.0的实验报告中已经有了，这份报告中主要介绍一下我改进的地方。
 
+### 二、项目文件
+
+根目录（/）
+
+```
+/test/                  存放各种版本的汇编文件(.s)、十六进制文件(.dat)
+/images/                存放实验报告所需的图片(.png)
+/source/                源代码(.sv)
+/MIPS64/                MIPS64官方文档
+.gitignore              git配置文件
+memfile.dat             当前使用的十六进制文件
+states.txt              Nexys4实验板演示说明
+MIPS32.md               MIPS32的说明文档
+README.md               说明文档
+Nexys4DDR_Master.xdc    Nexys4实验板引脚锁定文件
+simulation_behav.wcfg   仿真波形图配置文件
+```
+
+源代码（/source/）
+
+```
+alu.sv                  ALU计算单元
+aludec.sv               ALU控制单元，用于输出alucontrol信号
+clkdiv.sv               时钟分频模块模块，用于演示
+controller.sv           mips的控制单元，包含maindec和aludec两部分
+datapath.sv             数据通路，mips的核心结构
+flopenr.sv              时钟控制的可复位触发寄存器
+flopr.sv                可复位触发寄存器
+maindec.sv              主控单元
+mem.sv                  指令和数据的混合存储器
+mips.sv                 mips处理器的顶层模块
+mux2.sv                 2:1复用器
+mux3.sv                 3:1复用器
+mux4.sv                 4:1复用器
+mux5.sv                 5:1复用器
+onboard.sv              在Nexys4实验板上测试的顶层模块
+regfile.sv              寄存器文件
+signext.sv              符号拓展模块
+simulation.sv           仿真时使用的顶层模块
+sl2.sv                  左移2位
+top.sv                  包含mips和内存的顶层模块
+zeroext.sv              零拓展模块
+```
+
+<div STYLE="page-break-after: always;"></
+
 ### 三、存储器拓展
 
 在修改N=64后，我们还需要改变存储器中读写数据的代码：读数据的时候增加了信号readtype（0表示读单字，1表示读双字），因为MIPS64的指令仍然是32位的，大部分的数据操作也应该和单字相关；写数据的时候，与我写的MIPS32相兼容，用memwrite信号来进行控制，仍然是1表示写单字，2表示写单Byte，新增了memwrite=3表示写双字。具体的操作和32位也有一定区别，但也不难实现。
@@ -44,9 +90,9 @@ module mem#(parameter N = 64, L = 128)(
     assign word = dataadr[2] ? RAM[dataadr[N-1:3]][31:0] : RAM[dataadr[N-1:3]][63:32];
     always @(posedge clk)
         begin
-        if (memwrite===3)//D
+        if (memwrite==3)//D
             RAM[dataadr[N-1:3]] <= writedata;
-        else if (memwrite===2) //B
+        else if (memwrite==2) //B
                 case (dataadr[2:0])
                     3'b111:  RAM[dataadr[N-1:3]][7:0]   <= writedata[7:0];
                     3'b110:  RAM[dataadr[N-1:3]][15:8]  <= writedata[7:0];
@@ -57,8 +103,8 @@ module mem#(parameter N = 64, L = 128)(
                     3'b001:  RAM[dataadr[N-1:3]][55:48] <= writedata[7:0];
                     3'b000:  RAM[dataadr[N-1:3]][63:56] <= writedata[7:0];
                 endcase
-        else if (memwrite===1) //W
-            case (dataadr[2])
+        else if (memwrite==1) //W
+                case (dataadr[2])
                     0:  RAM[dataadr[N-1:3]][63:32]  <= writedata[31:0];
                     1:  RAM[dataadr[N-1:3]][31:0]   <= writedata[31:0];
                 endcase
@@ -246,7 +292,7 @@ main:   addi $2,$0,6
 
 ![testls](/images/testls.png)
 
-我在这个版本中还修改了simulation.sv中的部分代码，使其可以成功检测三组测试代码的顺利运行或者过长时间未结束。
+我在这个版本中还修改了simulation.sv中的部分代码，使其可以成功检测三组测试代码的顺利运行或者过长时间未结束：
 
 ```verilog
 /*simulation.sv*/
@@ -274,3 +320,34 @@ always @(negedge clk) begin
 ```
 
 ### 七、实验板测试
+
+实验板测试上没有增加新的功能，只能通过查看地址上两个单字的值来查看双字，演示的主要功能如下：
+
+1. 重置程序
+2. 暂停/继续程序
+3. 四倍速与常速两种运行速度
+4. 显示PC值、状态机的状态
+5. 显示时钟周期数
+6. 通关开关查看特定寄存器的部分值（最低的Byte）
+7. 通过开关查看内存中任意地址的值（按字来查看）
+8. 当内存被写入时，显示特殊文字突出
+
+从时钟上看，MIPS64与MIPS32一致
+
+![Timing](/images/Timing.png)
+从资源占用上看，MIPS64的LUT大约是MIPS32的两倍，其他资源占用基本一致
+
+**MIPS64 **
+
+![Utilization64](/images/Utilization64.png)
+
+**MIPS32**
+
+![Utilization32](/images/Utilization32.png)
+
+### 八、参考资料
+
+1. <a href="/MIPS64/MIPS64-Vol1.pdf">MIPS64-Vol1.pdf</a>
+2. <a href="/MIPS64/MIPS64-Vol2.pdf">MIPS64-Vol2.pdf</a>
+3. <a href="MIPS32.md">多周期32位CPU实验报告</a>
+
