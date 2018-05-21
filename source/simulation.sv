@@ -32,9 +32,9 @@ module simulation();
                  $stop;
             end
         end
-//        cnt = cnt + 1;
-//        if(cnt === 192)
-//            $stop;
+        cnt = cnt + 1;
+        if(cnt === 192)
+            $stop;
     end
 
 endmodule  
