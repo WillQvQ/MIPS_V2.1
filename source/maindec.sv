@@ -15,10 +15,10 @@ module maindec(
     output  logic [1:0] ltype,
     output  logic [4:0] stateshow
 ); 
-    typedef enum logic [4:0] {IF, ID, EX_LS,
-            MEM_LW, WB_L, MEM_SW, EX_RTYPE, WB_RTYPE, EX_BEQ,
-            EX_ADDI, EX_J, EX_ANDI, EX_BNE, MEM_LBU, MEM_LB, 
-            EX_ORI, EX_SLTI, MEM_SB, WB_I, MEM_LD, MEM_SD} statetype;
+    typedef enum logic [4:0] {IF, ID, EX_LS, MEM_LW, WB_L, 
+            MEM_SW, EX_RTYPE, WB_RTYPE, EX_BEQ, EX_ADDI, EX_J,
+            EX_ANDI, EX_BNE, MEM_LBU, MEM_LB, EX_ORI, EX_SLTI,
+            MEM_SB, WB_I, MEM_LD, MEM_SD, EX_DADDI} statetype;
     statetype state, nextstate;
     assign stateshow = state;
     parameter RTYPE = 6'b000000;
@@ -36,6 +36,7 @@ module maindec(
     parameter ANDI  = 6'b001100;
     parameter ORI   = 6'b001101;
     parameter SLTI  = 6'b001010;
+    parameter DADDI = 6'b011000;
     logic [21:0] controls; 
     always_ff @(posedge clk or posedge reset) begin
         $display("State is %d",state);
@@ -60,7 +61,8 @@ module maindec(
                 ADDI:   nextstate <= EX_ADDI;
                 ANDI:   nextstate <= EX_ANDI;
                 ORI:    nextstate <= EX_ORI; 
-                SLTI:   nextstate <= EX_SLTI; 
+                SLTI:   nextstate <= EX_SLTI;
+                DADDI:  nextstate <= EX_DADDI; 
                 default:nextstate <= IF;
             endcase
             EX_LS: case(op)
@@ -90,6 +92,7 @@ module maindec(
             EX_ANDI:    nextstate <= WB_I; 
             EX_ORI:     nextstate <= WB_I;
             EX_SLTI:    nextstate <= WB_I;
+            EX_DADDI:   nextstate <= WB_I;
             WB_I:       nextstate <= IF; 
             default:    nextstate <= IF;
         endcase
@@ -118,6 +121,7 @@ module maindec(
             EX_ANDI:    controls <= 22'b00_000_10000_0_100_00_011_000; 
             EX_ORI:     controls <= 22'b00_000_10000_0_100_00_100_000; 
             EX_SLTI:    controls <= 22'b00_000_10000_0_010_00_101_000; 
+            EX_DADDI:   controls <= 22'b00_000_10000_0_010_00_110_000; 
             WB_I:       controls <= 22'b00_001_00000_0_000_00_000_000;
             default:    controls <= 22'b00_000_xxxxx_x_xxx_xx_xxx_xxx;
         endcase

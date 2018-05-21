@@ -24,11 +24,15 @@ module simulation();
     always @(negedge clk) begin
         if (memwrite) begin
             if (dataadr === 84 & writedata === 7)begin
-                $display("LOG:Simulation succeeded");
+                $display("Test-standard2 pass!");
                 $stop;
             end
             if (dataadr === 128 & writedata === 7)begin
-                 $display("LOG:Simulation succeeded");
+                 $display("Test-power2 pass!");
+                 $stop;
+            end            
+            if (dataadr === 80 & writedata === 1)begin
+                 $display("Test-loadstore pass!");
                  $stop;
             end
         end
