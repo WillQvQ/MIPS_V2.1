@@ -1,0 +1,8 @@
+/MIPS_V2.1.cache/
+/MIPS_V2.1.hw/
+/MIPS_V2.1.ip_user_files/
+/MIPS_V2.1.runs/
+/MIPS_V2.1.sim/
+/MIPS_V2.1.srcs/
+*.xpr
+*.pdf
