@@ -6,23 +6,24 @@ module maindec(
     input   logic [5:0] op,
     output  logic       pcwrite, 
     output  logic [1:0] memwrite, 
-    output  logic       irwrite, regwrite, dtype,
+    output  logic       irwrite, regwrite,
     output  logic       branch, iord, memtoreg, regdst, alusrca, 
     output  logic [2:0] alusrcb,
     output  logic [1:0] pcsrc,
     output  logic [2:0] aluop,
     output  logic       bne, 
-    output  logic [1:0] ltype,
+    output  logic [2:0] readtype,
     output  logic [4:0] stateshow
 ); 
     typedef enum logic [4:0] {IF, ID, EX_LS, MEM_LW, WB_L, 
             MEM_SW, EX_RTYPE, WB_RTYPE, EX_BEQ, EX_ADDI, EX_J,
             EX_ANDI, EX_BNE, MEM_LBU, MEM_LB, EX_ORI, EX_SLTI,
-            MEM_SB, WB_I, MEM_LD, MEM_SD, EX_DADDI} statetype;
+            MEM_SB, WB_I, MEM_LD, MEM_SD, EX_DADDI, MEM_LWU} statetype;
     statetype state, nextstate;
     assign stateshow = state;
     parameter RTYPE = 6'b000000;
     parameter LD    = 6'b110111;
+    parameter LWU   = 6'b100111;
     parameter LW    = 6'b100011;
     parameter LBU   = 6'b100100;
     parameter LB    = 6'b100000;
@@ -51,6 +52,7 @@ module maindec(
                 SW:     nextstate <= EX_LS;
                 SB:     nextstate <= EX_LS;
                 LD:     nextstate <= EX_LS;
+                LWU:    nextstate <= EX_LS;
                 LW:     nextstate <= EX_LS;
                 LB:     nextstate <= EX_LS; 
                 LBU:    nextstate <= EX_LS; 
@@ -70,12 +72,14 @@ module maindec(
                 SW:     nextstate <= MEM_SW;
                 SB:     nextstate <= MEM_SB;
                 LD:     nextstate <= MEM_LD;
+                LWU:    nextstate <= MEM_LWU;
                 LW:     nextstate <= MEM_LW;
                 LBU:    nextstate <= MEM_LBU; 
                 LB:     nextstate <= MEM_LB;
                 default:nextstate <= IF;
             endcase
             MEM_LD:     nextstate <= WB_L;
+            MEM_LWU:    nextstate <= WB_L;
             MEM_LW:     nextstate <= WB_L;
             MEM_LBU:    nextstate <= WB_L;
             MEM_LB:     nextstate <= WB_L;
@@ -98,16 +102,17 @@ module maindec(
         endcase
     assign {memwrite, pcwrite, irwrite, regwrite,
             alusrca, branch, iord, memtoreg, regdst,
-            bne, alusrcb, pcsrc, aluop, ltype, dtype} = controls; 
+            bne, alusrcb, pcsrc, aluop, readtype} = controls; 
     always_comb
         case(state)
             IF:         controls <= 22'b00_110_00000_0_001_00_000_000;
             ID:         controls <= 22'b00_000_00000_0_011_00_000_000;
             EX_LS:      controls <= 22'b00_000_10000_0_010_00_000_000;
-            MEM_LD:     controls <= 22'b00_000_00100_0_000_00_000_001;
+            MEM_LD:     controls <= 22'b00_000_00100_0_000_00_000_100;
+            MEM_LWU:    controls <= 22'b00_000_00100_0_000_00_000_001;
             MEM_LW:     controls <= 22'b00_000_00100_0_000_00_000_000;
-            MEM_LB:     controls <= 22'b00_000_00100_0_000_00_000_100;
-            MEM_LBU:    controls <= 22'b00_000_00100_0_000_00_000_010;
+            MEM_LBU:    controls <= 22'b00_000_00100_0_000_00_000_011;
+            MEM_LB:     controls <= 22'b00_000_00100_0_000_00_000_010;
             WB_L:       controls <= 22'b00_001_00010_0_000_00_000_000;
             MEM_SD:     controls <= 22'b11_000_00100_0_000_00_000_000;
             MEM_SW:     controls <= 22'b01_000_00100_0_000_00_000_000;

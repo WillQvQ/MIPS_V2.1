@@ -8,13 +8,22 @@
 
 ```
 mem.sv          修改参数N=64，设定了写双字、写字和写位的操作
-mips.sv         增加了一条输出的控制信息
-controller.sv   增加了一条输出的控制信息
-maindec.sv      controls拓展到22位，在状体机上增加了几条指令的状态
-aludec.sv       增加了一些对双字的运算控制，alucontrol拓展到4位
+mips.sv         增加了一条输出的双字/单字选择的控制信号
+controller.sv   增加控制类型的信号的位数
+maindec.sv      controls拓展到22位，在状体机上增加了LD，LWU，SD，DADD，DSUB，DADDI这六条指令
+aludec.sv       增加了一些对双字的运算控制，将alucontrol拓展到4位
 datapath.sv     修改参数N=64，修改了部分信号的拼接方式
 alu.sv          修改参数N=64，增加了一些双字的运算，alucontrol拓展到4位
 ```
+
+最终我的项目支持：
+
+1. LD，LWU，LW，LBU，LB，SD，SW，SB 共8种读写指令
+2. ADD，SUB，OR，AND，SLT，DADD，DSUB，NOP* 共8种R类指令
+3. ADDI，ANDI，ORI，SLTI，DADDI 共5种I类计算指令
+4. BEQ，BNE，J 共3种分支、跳转指令
+
+*：根据官方文档\<MIPS64-Vol2\>，NOP 指令实际上是SLL r0, r0, 0，所以也属于R类指令
 
 对于整个系统的详细介绍在MIPS_V2.0的实验报告中已经有了，这份报告中主要介绍一下我改进的地方。
 
@@ -26,11 +35,11 @@ alu.sv          修改参数N=64，增加了一些双字的运算，alucontrol�
 /test/                  存放各种版本的汇编文件(.s)、十六进制文件(.dat)
 /images/                存放实验报告所需的图片(.png)
 /source/                源代码(.sv)
-/MIPS64/                MIPS64官方文档
+/Reference/             MIPS64官方文档等参考资料
 .gitignore              git配置文件
-memfile.dat             当前使用的十六进制文件
+memfile.dat             当前使用的十六进制文件（每行两条指令）
 states.txt              Nexys4实验板演示说明
-MIPS32.md               MIPS32的说明文档
+MIPS32实验报告.md        MIPS32的实验报告
 README.md               说明文档
 Nexys4DDR_Master.xdc    Nexys4实验板引脚锁定文件
 simulation_behav.wcfg   仿真波形图配置文件
@@ -64,192 +73,87 @@ zeroext.sv              零拓展模块
 
 ### 三、存储器拓展
 
-在修改N=64后，我们还需要改变存储器中读写数据的代码：读数据的时候增加了信号readtype（0表示读单字，1表示读双字），因为MIPS64的指令仍然是32位的，大部分的数据操作也应该和单字相关；写数据的时候，与我写的MIPS32相兼容，用memwrite信号来进行控制，仍然是1表示写单字，2表示写单Byte，新增了memwrite=3表示写双字。具体的操作和32位也有一定区别，但也不难实现。
+在修改N=64后，我们还需要改变存储器中读写数据的代码：
 
-```verilog
-/*mem.sv*/
-module mem#(parameter N = 64, L = 128)(
-    input   logic           clk, 
-    input   logic           readtype,
-    input   logic [1:0]     memwrite,
-    input   logic [N-1:0]   dataadr, writedata,
-    output  logic [N-1:0]   readdata,
-    input   logic [7:0]     checka,
-    output  logic [31:0]    check
-);
-    logic [N-1:0] RAM [L-1:0];
-    logic [31:0]  word;
-    initial
-        $readmemh("C:/Users/will131/Documents/workspace/MIPS_V2.1/memfile.dat",RAM);
-    assign readdata = readtype ? RAM[dataadr[N-1:3]] : {32'b0,word};
-    assign check = checka[0] ? RAM[checka][31:0] : RAM[checka][63:32];
-    assign word = dataadr[2] ? RAM[dataadr[N-1:3]][31:0] : RAM[dataadr[N-1:3]][63:32];
-    always @(posedge clk)
-        begin
-        if (memwrite==3)//D
-            RAM[dataadr[N-1:3]] <= writedata;
-        else if (memwrite==2) //B
-                case (dataadr[2:0])
-                    3'b111:  RAM[dataadr[N-1:3]][7:0]   <= writedata[7:0];
-                    3'b110:  RAM[dataadr[N-1:3]][15:8]  <= writedata[7:0];
-                    3'b101:  RAM[dataadr[N-1:3]][23:16] <= writedata[7:0];
-                    3'b100:  RAM[dataadr[N-1:3]][31:24] <= writedata[7:0];
-                    3'b011:  RAM[dataadr[N-1:3]][39:32] <= writedata[7:0];
-                    3'b010:  RAM[dataadr[N-1:3]][47:40] <= writedata[7:0];
-                    3'b001:  RAM[dataadr[N-1:3]][55:48] <= writedata[7:0];
-                    3'b000:  RAM[dataadr[N-1:3]][63:56] <= writedata[7:0];
-                endcase
-        else if (memwrite==1) //W
-                case (dataadr[2])
-                    0:  RAM[dataadr[N-1:3]][63:32]  <= writedata[31:0];
-                    1:  RAM[dataadr[N-1:3]][31:0]   <= writedata[31:0];
-                endcase
-        end 
-endmodule
-```
+1. 读数据的时候增加了信号dword表示读取的是否为双字。因为MIPS64的指令仍然是32位的，大部分的数据操作也应该和单字相关，所以同时支持两种读取方式是比较有效率的；
+2. 写数据的时候，用memwrite信号拓展到两位，为了与我写的MIPS32相兼容，仍然是1表示写单字，2表示写单Byte，新增了memwrite=3表示写双字。具体的操作上和32位有一定区别，但也不难实现。
+
+**详细代码见mem.sv**
 
 ### 四、寄存器与ALU拓展
 
 根据官方文档\<MIPS64-Vol1.pdf\>的描述，MIPS64的32位寄存器和64位寄存器共用空间和命名，相同名称的32位寄存器是对应64位寄存器的低32位。所以我们的寄存器代码不需要任何改动，只需要数据通路中选择参数为64。
 
-我的ALU代码使用的是简化版本，只支持线性计算操作。从32位改到64位的时候只需要增加一位alu_control ，最高位为1的为对应的双字运算。实际上，根据官方文档\<MIPS64-Vol2.pdf\>，双字运算只包含DADD,DADDI,DSUB等与ADD,ADDI,SUB对应的指令，而没有DAND,DSLT,DOR等指令。所以在alu_control 的编码上，我们还有更好的选择。但这里为了兼容我自己的32位版本，我没有做改动。
+我的ALU代码使用的是简化版本，只支持线性计算操作。从32位改到64位的时候只需要增加一位alu_control ，最高位为1的为原单字运算对应的双字运算。实际上，根据官方文档\<MIPS64-Vol2.pdf\>，双字运算只包含DADD, DADDI, DSUB等与ADD, ADDI, SUB对应的指令，而没有DAND, DSLT, DOR等指令。所以在alu_control 的编码上，我们还有更好的选择。但这里为了兼容我自己的32位版本，我没有做改动alu_control的编码。
 
-### 五、控制信号与数据通路拓展
+**详细代码见alu.sv**
 
-在控制信号上，64位的系统需要增加一位dtype ，表示当前处理的操作是否为双字操作；同时在alu_control 的输出上做出相应的改变，以支持DADD,DADDI,DSUB等指令。而数据通路上，将只需要将模块的整体参数N改为64，并修改如instr等几个小地方的代码即可。
+### 五、状态机与控制信号拓展
 
-我在兼容原32位的18个指令的基础上，增加了5个64位指令LD,SD,DADD,DADDI和DSUB。其中DADD和DSUB属于R类指令，不需要改动状态机，只需在aludec中增加支持即可。而LD,SD与LW,SW类似、DADDI与ADDI类似，只需仿照原来的指令设计状态即可。核心代码如下：
+在状态机上，我增加了LD，LWU，SD，DADDI等指令对应的状态，而双字的R运算则与单字的R运算状态完全相同。全部指令的状态变化如下表所示，其中不同指令公用的状态在上下连续时使用‘...’表示。可以看到：读写指令有着公用的EX阶段；读指令有着公用的WB阶段；I类计算指令也有着公用的WB阶段。
 
-```verilog
-/*maindec.sv*/
-module maindec(
-    input   logic       clk, reset,   
-    input   logic [5:0] op,
-    output  logic       pcwrite, 
-    output  logic [1:0] memwrite, 
-    output  logic       irwrite, regwrite, dtype,
-    output  logic       branch, iord, memtoreg, regdst, alusrca, 
-    output  logic [2:0] alusrcb,
-    output  logic [1:0] pcsrc,
-    output  logic [2:0] aluop,
-    output  logic       bne, 
-    output  logic [1:0] ltype,
-    output  logic [4:0] stateshow
-); 
-    typedef enum logic [4:0] {IF, ID, EX_LS, MEM_LW, WB_L, 
-            MEM_SW, EX_RTYPE, WB_RTYPE, EX_BEQ, EX_ADDI, EX_J,
-            EX_ANDI, EX_BNE, MEM_LBU, MEM_LB, EX_ORI, EX_SLTI,
-            MEM_SB, WB_I, MEM_LD, MEM_SD, EX_DADDI} statetype;
-    statetype state, nextstate;
-    assign stateshow = state;
-    parameter RTYPE = 6'b000000;
-    parameter LD    = 6'b110111;
-    parameter LW    = 6'b100011;
-    parameter LBU   = 6'b100100;
-    parameter LB    = 6'b100000;
-    parameter SD    = 6'b111111;
-    parameter SW    = 6'b101011;
-    parameter SB    = 6'b101000;
-    parameter BEQ   = 6'b000100;
-    parameter BNE   = 6'b000101;
-    parameter J     = 6'b000010;
-    parameter ADDI  = 6'b001000;
-    parameter ANDI  = 6'b001100;
-    parameter ORI   = 6'b001101;
-    parameter SLTI  = 6'b001010;
-    parameter DADDI = 6'b011000;
-    logic [21:0] controls; 
-    always_ff @(posedge clk or posedge reset) begin
-        $display("State is %d",state);
-        if(reset) state <= IF;
-        else state <= nextstate;
-    end
-    always_comb
-        case(state)
-            IF: nextstate <= ID;
-            ID: case(op)
-                SD:     nextstate <= EX_LS;
-                SW:     nextstate <= EX_LS;
-                SB:     nextstate <= EX_LS;
-                LD:     nextstate <= EX_LS;
-                LW:     nextstate <= EX_LS;
-                LB:     nextstate <= EX_LS; 
-                LBU:    nextstate <= EX_LS; 
-                RTYPE:  nextstate <= EX_RTYPE;
-                J:      nextstate <= EX_J;
-                BNE:    nextstate <= EX_BNE;
-                BEQ:    nextstate <= EX_BEQ;
-                ADDI:   nextstate <= EX_ADDI;
-                ANDI:   nextstate <= EX_ANDI;
-                ORI:    nextstate <= EX_ORI; 
-                SLTI:   nextstate <= EX_SLTI;
-                DADDI:  nextstate <= EX_DADDI; 
-                default:nextstate <= IF;
-            endcase
-            EX_LS: case(op)
-                SD:     nextstate <= MEM_SD;
-                SW:     nextstate <= MEM_SW;
-                SB:     nextstate <= MEM_SB;
-                LD:     nextstate <= MEM_LD;
-                LW:     nextstate <= MEM_LW;
-                LBU:    nextstate <= MEM_LBU; 
-                LB:     nextstate <= MEM_LB;
-                default:nextstate <= IF;
-            endcase
-            MEM_LD:     nextstate <= WB_L;
-            MEM_LW:     nextstate <= WB_L;
-            MEM_LBU:    nextstate <= WB_L;
-            MEM_LB:     nextstate <= WB_L;
-            MEM_SD:     nextstate <= IF;
-            MEM_SW:     nextstate <= IF;
-            MEM_SB:     nextstate <= IF;
-            WB_L:       nextstate <= IF;
-            EX_RTYPE:   nextstate <= WB_RTYPE;
-            WB_RTYPE:   nextstate <= IF;
-            EX_BEQ:     nextstate <= IF;
-            EX_BNE:     nextstate <= IF;
-            EX_J:       nextstate <= IF;
-            EX_ADDI:    nextstate <= WB_I;
-            EX_ANDI:    nextstate <= WB_I; 
-            EX_ORI:     nextstate <= WB_I;
-            EX_SLTI:    nextstate <= WB_I;
-            EX_DADDI:   nextstate <= WB_I;
-            WB_I:       nextstate <= IF; 
-            default:    nextstate <= IF;
-        endcase
-    assign {memwrite, pcwrite, irwrite, regwrite,
-            alusrca, branch, iord, memtoreg, regdst,
-            bne, alusrcb, pcsrc, aluop, ltype, dtype} = controls; 
-    always_comb
-        case(state)
-            IF:         controls <= 22'b00_110_00000_0_001_00_000_000;
-            ID:         controls <= 22'b00_000_00000_0_011_00_000_000;
-            EX_LS:      controls <= 22'b00_000_10000_0_010_00_000_000;
-            MEM_LD:     controls <= 22'b00_000_00100_0_000_00_000_001;
-            MEM_LW:     controls <= 22'b00_000_00100_0_000_00_000_000;
-            MEM_LB:     controls <= 22'b00_000_00100_0_000_00_000_100;
-            MEM_LBU:    controls <= 22'b00_000_00100_0_000_00_000_010;
-            WB_L:       controls <= 22'b00_001_00010_0_000_00_000_000;
-            MEM_SD:     controls <= 22'b11_000_00100_0_000_00_000_000;
-            MEM_SW:     controls <= 22'b01_000_00100_0_000_00_000_000;
-            MEM_SB:     controls <= 22'b10_000_00100_0_000_00_000_000;
-            EX_RTYPE:   controls <= 22'b00_000_10000_0_000_00_010_000;
-            WB_RTYPE:   controls <= 22'b00_001_00001_0_000_00_000_000;
-            EX_BEQ:     controls <= 22'b00_000_11000_0_000_01_001_000;
-            EX_BNE:     controls <= 22'b00_000_10000_1_000_01_001_000;
-            EX_J:       controls <= 22'b00_100_00000_0_000_10_000_000;
-            EX_ADDI:    controls <= 22'b00_000_10000_0_010_00_000_000;
-            EX_ANDI:    controls <= 22'b00_000_10000_0_100_00_011_000; 
-            EX_ORI:     controls <= 22'b00_000_10000_0_100_00_100_000; 
-            EX_SLTI:    controls <= 22'b00_000_10000_0_010_00_101_000; 
-            EX_DADDI:   controls <= 22'b00_000_10000_0_010_00_110_000; 
-            WB_I:       controls <= 22'b00_001_00000_0_000_00_000_000;
-            default:    controls <= 22'b00_000_xxxxx_x_xxx_xx_xxx_xxx;
-        endcase
-endmodule
+| 指令  | IF   | ID   | EX       | MEM     | WB       |
+| ----- | ---- | ---- | -------- | ------- | -------- |
+| RTYPE | IF   | ID   | EX_RTYPE |         | WB_RTYPE |
+|       |      |      |          |         |          |
+| LD    | ...  | ...  | EX_LS    | MEM_LD  | WB_L     |
+| LWU   | ...  | ...  | ...      | MEM_LWU | ...      |
+| LW    | ...  | ...  | ...      | MEM_LW  | ...      |
+| LBU   | ...  | ...  | ...      | MEM_LBU | ...      |
+| LWU   | ...  | ...  | ...      | MEM_LB  | WB_L     |
+| SD    | ...  | ...  | ...      | MEM_SD  |          |
+| SW    | ...  | ...  | ...      | MEM_SW  |          |
+| SB    | ...  | ...  | EX_LS    | MEM_SB  |          |
+|       |      |      |          |         |          |
+| BEQ   | ...  | ...  | EX_BEQ   |         |          |
+| BNE   | ...  | ...  | EX_BNE   |         |          |
+| J     | ...  | ...  | EX_J     |         |          |
+|       |      |      |          |         |          |
+| DADDI | ...  | ...  | EX_DADDI |         | WB_I     |
+| ADDI  | ...  | ...  | EX_ADDI  |         | ...      |
+| ANDI  | ...  | ...  | EX_ANDI  |         | ...      |
+| ORI   | ...  | ...  | EX_ORI   |         | ...      |
+| SLTI  | IF   | ID   | EX_SLTI  |         | WB_I     |
+
+在控制信号上，主要将readtype(原来叫ltype)的位数增加为3位，用000表示读取Signed Word，001表示读取Unsigned Word，010表示写读取Signed Byte，011表示写读取Unsigned Byte,100表示读取Double Word。其中readtype的最高位还可以输出到mem里面控制是否读双字。全部控制信号的含义如下
+
+```
+memwrite[1:0]       写存储器的类型，0表示不写，1表示写Word，2表示写Byte,3表示写DoubleWord
+pcwrite             用于计算pcen，pcen最后决定是否更新pc
+irwrite             决定从存储器读出的数据是否当作指令进行译码
+regwrite            是否写寄存器
+alusrca             决定ALU的第一个运算数
+branch              是否分支,用于计算pcen
+iord                决定了从存储器读出的为指令还是数据
+memtoreg            是否有从存储器到寄存器的数据存储
+regdst              是否为R类指令
+bne                 是否为bne指令,用于计算pcen
+alusrcb[2:0]        决定ALU的第二个运算数
+pcsrc[1:0]          决定下一个pc的计算方式
+aluop[2:0]          决定了alu计算的方式，传给aludec进行具体的控制
+readtype[2:0]       读存储器的类型，
 ```
 
-### 六、仿真测试
+**详细代码见maindec.sv**
+
+### 六、数据通路拓展
+
+数据通路上主要就是修改N=64，但其中有一点需要注意的是：在64位MIPS系统中，读取的32位数据后需要拓展成64位。其中有两种方法，一种是符号拓展（LW）,另一种是零拓展（LWU），所以读取完数据要根据readtype信号从五个拓展后的数据中选取一个，这一块的代码如下：
+
+```verilog
+/* datapath.sv */
+mux4    #(B)    lbmux(readdata[31:24], readdata[23:16], readdata[15:8],
+                     readdata[7:0], aluout[1:0], mbyte);
+zeroext #(B,N)  lbze(mbyte, mbytezext);
+signext #(B,N)  lbse(mbyte, mbytesext);
+zeroext #(W,N)  lwze(readdata[31:0], mwordzext);
+signext #(W,N)  lwse(readdata[31:0], mwordsext);
+mux5    #(N)    datamux(mwordsext,mwordzext,mbytesext,mbytezext,readdata,readtype,memdata);
+```
+
+**我在ftp上传的版本中没有添加LWU指令。而LW指令实际上实现成了LWU指令，是一个明显的错误。但由于测试数据中没有直接读取负数单字，所以没有发现这个错误**
+
+### 七、仿真测试
 
 我使用三个测试程序对我的64位MIPS进行测试，前两个程序与32位测试程序相同，主要用于测试兼容性，不过.dat文件要改成每行16个十六进制数的形式，类似于下面的形式：
 
@@ -257,9 +161,9 @@ endmodule
 20020006dc430042
 9044003700832820
 a04500390064302c
-0064382018c6000d
+0064382060c6000d
 0043402efc460042
-fc47004afc480052
+fc480052fc47004a
 0000000000000000
 0000000001020304
 0000001100000011
@@ -270,41 +174,42 @@ fc47004afc480052
 
 ```assembly
 # testls.s
-main:   addi $2,$0,6
-        ld   $3,66($2) # ld
-        lbu  $4,55($2) 
-        add  $5,$4,$3
-        sb   $5,57($2)
-        dadd  $6,$3,$4  # dadd
-        add  $7,$3,$4    
-        daddi $6,$6,13  # daddi
-        dsub  $8,$2,$3  # dsub 
-        sd   $6,66($2) 	# sd
-        sd   $7,74($2) 	# sd
-        sd   $8,82($2) 	# sd
+main:   addi $2,$0,6    # $2=6
+        ld   $3,66($2)  # $3 = 0xffffffff
+        lbu  $4,55($2)  # $4 = 2
+        add  $5,$4,$3   # $5 = 0x1
+        sb   $5,57($2)  # sb
+        dadd  $6,$3,$4  # $6 = 0x100000001
+        add  $7,$3,$4   # $7 = 0x1
+        daddi $6,$6,13  # $6 = 0x10000000e
+        dsub  $8,$2,$3  # $8 = 0xffffffff00000007
+        sd   $6,66($2)  # sd
+        sd   $8,82($2)  # sd
+        sd   $7,74($2)  # sd
+
 ```
 
 我的仿真波形图如下，可以看到我们的CPU成功读取了72位置上双字，61位置上的Byte，（拓展后）相加取出低位存到63位置；然后我们分别用DADD和ADD指令相r3和r4，可以看到DADD成功地计算出了结果（结果变为100000001），而ADD指令造成了溢出（结果变为1）。后面我们还可以看到daddi，dsub和sd指令都得到了正确的结果。
 
 ![testls](/images/testls.png)
 
-我在这个版本中还修改了simulation.sv中的部分代码，使其可以成功检测三组测试代码的顺利运行或者过长时间未结束：
+我在这个版本中还修改了simulation.sv中的部分代码，使其可以成功检测三组测试代码的顺利运行，或者运行了过长时间未结束：
 
 ```verilog
 /*simulation.sv*/
 always @(negedge clk) begin
         if (memwrite) begin
-            if (dataadr === 84 & writedata === 7)begin
+            if (dataadr === 100 & writedata === 7)begin
                 $display("Test-standard2 pass!");
-                $stop;
+                #100  $stop;
             end
             if (dataadr === 128 & writedata === 7)begin
                  $display("Test-power2 pass!");
-                 $stop;
+                 #100 $stop;
             end            
             if (dataadr === 80 & writedata === 1)begin
                  $display("Test-loadstore pass!");
-                 $stop;
+                 #100 $stop;
             end
         end
         cnt = cnt + 1;
@@ -315,9 +220,9 @@ always @(negedge clk) begin
     end
 ```
 
-### 七、实验板测试
+### 八、实验板演示
 
-实验板测试上没有增加新的功能，只能通过查看地址上两个单字的值来查看双字，演示的主要功能如下：
+我在实验板演示上没有增加新的功能，所以只能通过查看地址上两个单字的值来查看双字，演示的主要功能如下：
 
 1. 重置程序；暂停/继续程序
 2. 四倍速与常速两种运行速度
@@ -326,6 +231,10 @@ always @(negedge clk) begin
 5. 通关开关查看特定寄存器的部分值（最低的Byte）
 6. 通过开关查看内存中任意地址的值（按字来查看）
 7. 当内存被写入时，显示特殊文字突出
+
+**因为回寝室没有实验板了，所以这一块代码没有改动了。我计划在64位流水线上尝试适合64位系统的演示方式**
+
+### 九、时钟与资源
 
 从时钟上看，MIPS64与MIPS32一致
 
@@ -340,9 +249,9 @@ always @(negedge clk) begin
 
 ![Utilization32](/images/Utilization32.png)
 
-### 八、参考资料
+### 十、参考资料
 
-1. <a href="/MIPS64/MIPS64-Vol1.pdf">MIPS64-Vol1.pdf</a>
-2. <a href="/MIPS64/MIPS64-Vol2.pdf">MIPS64-Vol2.pdf</a>
-3. <a href="MIPS32.md">多周期32位CPU实验报告</a>
+1. <a href="/Reference/MIPS64-Vol1.pdf">MIPS64-Vol1.pdf</a>
+2. <a href="/Reference/MIPS64-Vol2.pdf">MIPS64-Vol2.pdf</a>
+3. <a href="MIPS32实验报告.md">多周期32位CPU实验报告</a>
 

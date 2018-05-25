@@ -31,3 +31,4 @@ S8-S15 用于检查的寄存器/存储器的地址
 13  MEM_LD
 14  MEM_SD
 15  EX_DADDI
+16  MEM_LWU
