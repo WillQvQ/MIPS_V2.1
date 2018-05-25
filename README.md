@@ -27,6 +27,8 @@ alu.sv          修改参数N=64，增加了一些双字的运算，alucontrol�
 
 对于整个系统的详细介绍在MIPS_V2.0的实验报告中已经有了，这份报告中主要介绍一下我改进的地方。
 
+<div STYLE="page-break-after: always;"></div>
+
 ### 二、项目文件
 
 根目录（/）
@@ -71,6 +73,8 @@ top.sv                  包含mips和内存的顶层模块
 zeroext.sv              零拓展模块
 ```
 
+<div STYLE="page-break-after: always;"></div>
+
 ### 三、存储器拓展
 
 在修改N=64后，我们还需要改变存储器中读写数据的代码：
@@ -88,7 +92,27 @@ zeroext.sv              零拓展模块
 
 **详细代码见alu.sv**
 
-### 五、状态机与控制信号拓展
+### 五、控制信号与状态机拓展
+
+在控制信号上，主要将readtype(原来叫ltype)的位数增加为3位，用000表示读取Signed Word，001表示读取Unsigned Word，010表示写读取Signed Byte，011表示写读取Unsigned Byte,100表示读取Double Word。其中readtype的最高位还可以输出到mem里面控制是否读双字。全部控制信号的含义如下
+
+```
+memwrite[1:0]       写存储器的类型，0表示不写，1表示写Word，2表示写Byte,3表示写DoubleWord
+pcwrite             用于计算pcen，pcen最后决定是否更新pc
+irwrite             决定从存储器读出的数据是否当作指令进行译码
+regwrite            是否写寄存器
+alusrca             决定ALU的第一个运算数
+branch              是否分支,用于计算pcen
+iord                决定了从存储器读出的为指令还是数据
+memtoreg            是否有从存储器到寄存器的数据存储
+regdst              是否为R类指令
+bne                 是否为bne指令,用于计算pcen
+alusrcb[2:0]        决定ALU的第二个运算数
+pcsrc[1:0]          决定下一个pc的计算方式
+aluop[2:0]          决定了alu计算的方式，传给aludec进行具体的控制
+readtype[2:0]       读存储器的类型，
+```
+
 
 在状态机上，我增加了LD，LWU，SD，DADDI等指令对应的状态，而双字的R运算则与单字的R运算状态完全相同。全部指令的状态变化如下表所示，其中不同指令公用的状态在上下连续时使用‘...’表示。可以看到：读写指令有着公用的EX阶段；读指令有着公用的WB阶段；I类计算指令也有着公用的WB阶段。
 
@@ -115,26 +139,9 @@ zeroext.sv              零拓展模块
 | ORI   | ...  | ...  | EX_ORI   |         | ...      |
 | SLTI  | IF   | ID   | EX_SLTI  |         | WB_I     |
 
-在控制信号上，主要将readtype(原来叫ltype)的位数增加为3位，用000表示读取Signed Word，001表示读取Unsigned Word，010表示写读取Signed Byte，011表示写读取Unsigned Byte,100表示读取Double Word。其中readtype的最高位还可以输出到mem里面控制是否读双字。全部控制信号的含义如下
-
-```
-memwrite[1:0]       写存储器的类型，0表示不写，1表示写Word，2表示写Byte,3表示写DoubleWord
-pcwrite             用于计算pcen，pcen最后决定是否更新pc
-irwrite             决定从存储器读出的数据是否当作指令进行译码
-regwrite            是否写寄存器
-alusrca             决定ALU的第一个运算数
-branch              是否分支,用于计算pcen
-iord                决定了从存储器读出的为指令还是数据
-memtoreg            是否有从存储器到寄存器的数据存储
-regdst              是否为R类指令
-bne                 是否为bne指令,用于计算pcen
-alusrcb[2:0]        决定ALU的第二个运算数
-pcsrc[1:0]          决定下一个pc的计算方式
-aluop[2:0]          决定了alu计算的方式，传给aludec进行具体的控制
-readtype[2:0]       读存储器的类型，
-```
-
 **详细代码见maindec.sv**
+
+<div STYLE="page-break-after: always;"></div>
 
 ### 六、数据通路拓展
 
