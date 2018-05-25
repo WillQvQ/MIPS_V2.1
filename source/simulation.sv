@@ -34,7 +34,7 @@ module simulation();
             end            
             if (dataadr === 80 & writedata === 1)begin
                  $display("Test-loadstore pass!");
-                 $stop;
+                 #100 $stop;
             end
         end
         cnt = cnt + 1;
